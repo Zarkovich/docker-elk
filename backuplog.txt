@@ -1,0 +1,144 @@
+
+input {
+	# beats {
+	# 	port => 5044
+	# 	#set a type
+	# 	type => filebeat
+	# }
+	# beats {
+	# 	port => 5064
+	# 	#set a type
+	# 	type => metric
+	# }
+
+	file {
+		path => "/data/*.json"
+		start_position => "beginning"
+		sincedb_path => "NUL"
+		codec => "json"
+	}
+
+# 	rabbitmq {
+# 		# connect to rabbit
+# 		host => "hml.ger7.com.br"
+# 		port => 5672
+# 		# vhost => "/"	
+# 		# Consume from existing queue
+# 		queue => "TelemetriaExchange"
+# 		durable => true
+# 		auto_delete => false
+# 		# No ack will boost your perf
+# 		ack => false
+# 		#set a type
+# 		type => rabbit
+# 		user => "user"
+# 		password => "user123"
+#   }
+}
+
+filter{
+	# if[type] == "rabbit"{
+		json{
+			source => "message"
+		}
+		ruby {
+			code => '
+				c = event.get("[telemetry][geolocation][gps]")
+				if c.is_a? Array
+					c.each { |x|
+						latitude = x["lat"]
+						longitude = x["long"]
+
+						if latitude.is_a? Array
+							lat = latitude[latitude.size - 1]
+							long = longitude[longitude.size -1]
+							event.set("Geolocation", [long,lat])
+						else
+							lat = latitude
+							long = longitude
+							event.set("Geolocation", [long,lat])
+						end
+					}
+				end
+			'
+     	}					
+		mutate{
+			remove_field => ["message", "@version", "path", "host"]
+		}
+	# }
+
+	# data processing if this from filebeat
+	# if[type] == "filebeat"{
+
+	# 	grok {
+	# 		match => {
+	# 		"message" => ["\[%{NUMBER:threadId}\]\[%{GREEDYDATA:sourceTimestamp}\]\n\[%{GREEDYDATA:json_data}\]"]
+	# 		}
+	# 	}
+
+	# 	json{
+	# 		source => "json_data"
+	# 	}
+
+	# 	# change TransactionType (numeric) to TransactionTypeName (string)
+	# 	# e.g. 1 = credit
+	# 	mutate {
+	# 		convert => { "TransactionType" => "integer" }
+	# 	}
+	# 	if [TransactionType] == 1 {	mutate { add_field => { "TransactionTypeName" => "Crédito" }}}		
+	# 	if [TransactionType] == 2 {	mutate { add_field => { "TransactionTypeName" => "Débito" }}}
+	# 	if [TransactionType] == 3 {	mutate { add_field => { "TransactionTypeName" => "Cancelamento" }}}
+	# 	if [TransactionType] == 4 {	mutate { add_field => { "TransactionTypeName" => "Voucher" }}}
+	# 	if [TransactionType] == 5 {	mutate { add_field => { "TransactionTypeName" => "Desfazimento" }}}
+	# 	if [TransactionType] == 6 {	mutate { add_field => { "TransactionTypeName" => "Pré-autorização" }}}
+	# 	if [TransactionType] == 7 {	mutate { add_field => { "TransactionTypeName" => "Confirmação de pré-autorização" }}}
+	# 	if [TransactionType] == 8 {	mutate { add_field => { "TransactionTypeName" => "RUF" }}}
+	# 	if [TransactionType] == 9 {	mutate { add_field => { "TransactionTypeName" => "Compra com troco" }}}
+	# 	if [TransactionType] == 10 {	mutate { add_field => { "TransactionTypeName" => "Saque" }}}
+
+	# 	# change Media (numeric) to MediaName (string)
+	# 	# e.g. 1 = Celular
+	# 	mutate {
+	# 		convert => { "Media" => "integer" }
+	# 	}
+	# 	if [Media] == 1 {	mutate { add_field => { "MediaTypeName" => "Celular" }}}		
+	# 	if [Media] == 2 {	mutate { add_field => { "MediaTypeName" => "Ethernet" }}}
+	# 	if [Media] == 3 {	mutate { add_field => { "MediaTypeName" => "Discado síncrono SDLC" }}}
+	# 	if [Media] == 4 {	mutate { add_field => { "MediaTypeName" => "Discado assíncrono NPP1" }}}
+	# 	if [Media] == 5 {	mutate { add_field => { "MediaTypeName" => "WiFi" }}}
+	# 	if [Media] == 6 {	mutate { add_field => { "MediaTypeName" => "Discado assíncrono RENPAC" }}}
+	# 	if [Media] == 7 {	mutate { add_field => { "MediaTypeName" => "CSD" }}}
+		
+	# 	mutate{
+	# 		remove_field => ["message", "@version", "path", "host", "json_data"]
+	# 	}
+	# }
+}
+# ## Add your filters / logstash plugins configuration here
+
+output {
+	# if[type] == "filebeat"{
+	# 	elasticsearch {
+	# 		hosts => "elasticsearch:9200"
+	# 		index => "filebeat"
+	# 		user => "elastic"
+	# 		password => "changeme"
+	# 	}
+	# }
+	# if[type] == "rabbit"{
+		elasticsearch {
+			hosts => "elasticsearch:9200"
+			index => "file"
+			user => "elastic"
+			password => "changeme"
+		}
+	# }
+	# if[type] == "metric"{
+	# 	elasticsearch {
+	# 		hosts => "elasticsearch:9200"
+	# 		index => "metric"
+	# 		user => "elastic"
+	# 		password => "changeme"
+	# 	}
+	# }
+}
